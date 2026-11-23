@@ -1,0 +1,6 @@
+{
+  "name": "BASA Radio",
+  "description": "Estudio de radio online y emisora personal con carga de música propia, Auto-DJ con crossfade, ecualizador de 5 bandas y consola de locución.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
