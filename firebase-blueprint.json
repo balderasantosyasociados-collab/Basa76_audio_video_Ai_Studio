@@ -1,0 +1,279 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private profile for an authenticated BASA Studio creator.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 200
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "email", "createdAt", "updatedAt"]
+    },
+    "CreativeProduction": {
+      "title": "CreativeProduction",
+      "description": "User-owned music, video, series, or film production with screenplay, soundtrack metadata, copyright contract, and download entitlement.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "format": {
+          "type": "string",
+          "enum": ["music", "video", "series", "movie"]
+        },
+        "sourceBasis": {
+          "type": "string",
+          "enum": ["original", "myth", "real_history"]
+        },
+        "studioStyle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "targetPlatform": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "resolution": {
+          "type": "string",
+          "enum": ["1080p", "4K", "5K"]
+        },
+        "promptInput": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1500
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "genre": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "rating": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "logline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "synopsis": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "lyrics": {
+          "type": "string",
+          "maxLength": 5000
+        },
+        "soundtrackPrompt": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "bpm": {
+          "type": "integer"
+        },
+        "drumStyle": {
+          "type": "string",
+          "enum": ["reggaeton", "trap", "house", "lofi", "pop", "rock", "afrobeat", "synthwave"]
+        },
+        "chordProgressionJson": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "bassNotesJson": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "melodyNotesJson": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "charactersJson": {
+          "type": "string",
+          "maxLength": 6000
+        },
+        "scenesJson": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "contractSigned": {
+          "type": "boolean"
+        },
+        "contractSignerName": {
+          "type": "string",
+          "maxLength": 140
+        },
+        "contractDocumentId": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "contractHash": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "isPaid": {
+          "type": "boolean"
+        },
+        "licenseTier": {
+          "type": "string",
+          "enum": ["none", "music_single", "video_5k", "series_film_master"]
+        },
+        "isPublicCatalog": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "ownerName",
+        "format",
+        "sourceBasis",
+        "studioStyle",
+        "targetPlatform",
+        "resolution",
+        "promptInput",
+        "title",
+        "genre",
+        "logline",
+        "synopsis",
+        "bpm",
+        "drumStyle",
+        "contractSigned",
+        "isPaid",
+        "licenseTier",
+        "isPublicCatalog",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LicenseOrder": {
+      "title": "LicenseOrder",
+      "description": "Download license checkout record confirming payment for a specific production.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "productionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "licenseTier": {
+          "type": "string",
+          "enum": ["music_single", "video_5k", "series_film_master"]
+        },
+        "amountUsd": {
+          "type": "number"
+        },
+        "paymentMethodLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "status": {
+          "type": "string",
+          "enum": ["paid"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "productionId",
+        "licenseTier",
+        "amountUsd",
+        "paymentMethodLabel",
+        "status",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile document isolated to the owning user."
+    },
+    "/users/{userId}/productions/{productionId}": {
+      "schema": { "$ref": "#/entities/CreativeProduction" },
+      "description": "Per-user segregated history of created music, videos, series, and movies."
+    },
+    "/users/{userId}/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/LicenseOrder" },
+      "description": "Per-user license payment records unlocking download access."
+    },
+    "/publicCatalog/{productionId}": {
+      "schema": { "$ref": "#/entities/CreativeProduction" },
+      "description": "Publicly shared 5K/HD showcase entries published by creators."
+    }
+  }
+}

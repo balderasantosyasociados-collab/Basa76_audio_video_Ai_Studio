@@ -382,6 +382,173 @@ app.post('/api/github/sync', async (req: Request, res: Response) => {
   }
 });
 
+// 5. Autonomous Creative Studio (Music, Video, Series, Movie from 1 word, sentence, or full topic)
+app.post('/api/ai/create-production', async (req: Request, res: Response) => {
+  const ai = getAiClient();
+  if (!ai) {
+    res.status(503).json({
+      error: 'El servicio Gemini aún no tiene una clave configurada en Secrets.',
+    });
+    return;
+  }
+
+  const promptInput = sanitizeText(req.body?.promptInput, 1400);
+  const formatRaw = sanitizeText(req.body?.format, 20);
+  const sourceBasisRaw = sanitizeText(req.body?.sourceBasis, 30);
+  const studioStyle = sanitizeText(req.body?.studioStyle, 100) || 'Walt Disney / Sony & Columbia Pictures';
+  const targetPlatform = sanitizeText(req.body?.targetPlatform, 60) || 'Netflix & YouTube 5K';
+  const resolutionRaw = sanitizeText(req.body?.resolution, 20);
+  const language = sanitizeText(req.body?.language, 40) || 'Español';
+
+  const format = ['music', 'video', 'series', 'movie'].includes(formatRaw) ? formatRaw : 'series';
+  const sourceBasis = ['original', 'myth', 'real_history'].includes(sourceBasisRaw)
+    ? sourceBasisRaw
+    : 'original';
+  const resolution = ['1080p', '4K', '5K'].includes(resolutionRaw) ? resolutionRaw : '5K';
+
+  if (!promptInput) {
+    res.status(400).json({ error: 'Escribe al menos una palabra, oración o tema para crear tu obra.' });
+    return;
+  }
+
+  try {
+    const basisNote =
+      sourceBasis === 'myth'
+        ? 'Basada profundamente en mitología, leyendas ancestrales o relatos épicos.'
+        : sourceBasis === 'real_history'
+        ? 'Basada en hechos históricos reales o crónicas documentadas con rigor dramático.'
+        : 'Historia 100% original con construcción de mundo propia.';
+
+    const prompt = `Eres Showrunner, Director de Cine de Estudio (${studioStyle}) y Productor Musical para ${targetPlatform} en calidad ${resolution}.
+El usuario ingresó esta semilla creativa (puede ser una sola palabra, una frase o un tema completo):
+"${promptInput}"
+
+Formato solicitado: ${format.toUpperCase()}
+Enfoque narrativo: ${basisNote}
+Idioma: ${language}
+
+Genera una producción cinematográfica y musical COMPLETA en JSON estricto:
+- "title": título impactante de película/serie/video/canción.
+- "genre": género cinematográfico y musical combinado.
+- "rating": clasificación ("ATP", "+13", "+16").
+- "logline": gancho comercial de 1 frase estilo Netflix/Disney.
+- "synopsis": sinopsis narrativa rica de 2 a 3 párrafos digna de gran estudio.
+- "characters": exactamente 4 personajes principales con "name", "role" y "description".
+- "scenes": exactamente 6 escenas clave o episodios de temporada (si es serie), cada uno con "index" (1..6), "title", "durationLabel" (ej. "48 min" o "04:20"), "visualDescription" (descripción visual cinematográfica rica), "cameraAndLighting" (ej. "IMAX 65mm · Iluminación dorada anamórfica"), "dialogue" (línea dramática memorable) y "accentColor" (color hex válido como "#E11D48", "#F59E0B", "#3B82F6", "#10B981").
+- "soundtrackPrompt": prompt para banda sonora épica estilo Hans Zimmer / Suno / Gemini Music.
+- "lyrics": canción tema principal completa con [Intro], [Verso 1], [Coro], [Outro].
+- "bpm": entero entre 74 y 148.
+- "drumStyle": exactamente uno de "reggaeton", "trap", "house", "lofi", "pop", "rock", "afrobeat", "synthwave".
+- "chordProgression": 4 acordes de 3-4 notas MIDI enteras (48..76).
+- "bassNotes": 8 notas MIDI enteras (31..52).
+- "melodyNotes": 16 notas MIDI enteras (60..84).`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-4-hydrogen',
+      contents: prompt,
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            genre: { type: Type.STRING },
+            rating: { type: Type.STRING },
+            logline: { type: Type.STRING },
+            synopsis: { type: Type.STRING },
+            soundtrackPrompt: { type: Type.STRING },
+            lyrics: { type: Type.STRING },
+            bpm: { type: Type.INTEGER },
+            drumStyle: { type: Type.STRING },
+            characters: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  role: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                },
+                required: ['name', 'role', 'description'],
+              },
+            },
+            scenes: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  index: { type: Type.INTEGER },
+                  title: { type: Type.STRING },
+                  durationLabel: { type: Type.STRING },
+                  visualDescription: { type: Type.STRING },
+                  cameraAndLighting: { type: Type.STRING },
+                  dialogue: { type: Type.STRING },
+                  accentColor: { type: Type.STRING },
+                },
+                required: [
+                  'index',
+                  'title',
+                  'durationLabel',
+                  'visualDescription',
+                  'cameraAndLighting',
+                  'dialogue',
+                  'accentColor',
+                ],
+              },
+            },
+            chordProgression: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.ARRAY,
+                items: { type: Type.INTEGER },
+              },
+            },
+            bassNotes: {
+              type: Type.ARRAY,
+              items: { type: Type.INTEGER },
+            },
+            melodyNotes: {
+              type: Type.ARRAY,
+              items: { type: Type.INTEGER },
+            },
+          },
+          required: [
+            'title',
+            'genre',
+            'rating',
+            'logline',
+            'synopsis',
+            'soundtrackPrompt',
+            'lyrics',
+            'bpm',
+            'drumStyle',
+            'characters',
+            'scenes',
+            'chordProgression',
+            'bassNotes',
+            'melodyNotes',
+          ],
+        },
+      },
+    });
+
+    const parsed = JSON.parse((response.text || '{}').trim());
+    res.json({
+      ...parsed,
+      format,
+      sourceBasis,
+      studioStyle,
+      targetPlatform,
+      resolution,
+      promptInput,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error generando la producción creativa.';
+    res.status(500).json({ error: message });
+  }
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');

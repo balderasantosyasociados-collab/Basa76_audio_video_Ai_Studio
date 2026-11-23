@@ -15,15 +15,37 @@ import {
   Menu,
   X,
   Sparkles,
+  Clapperboard,
+  Film,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import {
   AiGeneratedSong,
+  CreativeProduction,
+  LicenseTier,
   NavSection,
   Playlist,
   RadioStream,
   StationConfig,
   Track,
 } from './types/radio';
+import {
+  auth,
+  signInWithGoogle,
+  signOutUser,
+  syncUserProfile,
+} from './firebase';
+import {
+  createUserProduction,
+  deleteUserProduction,
+  signProductionContract,
+  subscribePublicCatalog,
+  subscribeUserProductions,
+  togglePublicCatalogStatus,
+  unlockProductionWithOrder,
+} from './utils/firestoreProductions';
 import {
   DEFAULT_CONFIG,
   DEFAULT_STREAMS,
@@ -49,6 +71,8 @@ import { useRadioEngine } from './audio/useRadioEngine';
 import { CoverArtwork } from './components/CoverArtwork';
 import { StudioConsoleView } from './components/StudioConsoleView';
 import { AiMusicStudioView } from './components/AiMusicStudioView';
+import { CreativeStudioView } from './components/CreativeStudioView';
+import { CinemaVaultView } from './components/CinemaVaultView';
 import { MusicLibraryView } from './components/MusicLibraryView';
 import { PlaylistsView } from './components/PlaylistsView';
 import { StreamsView } from './components/StreamsView';
@@ -57,6 +81,8 @@ import { EqualizerSettingsView } from './components/EqualizerSettingsView';
 const NAV_ITEMS: { id: NavSection; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'studio', label: 'Estudio en Vivo', icon: Radio },
   { id: 'ai-studio', label: 'IA Musical Autónoma', icon: Sparkles },
+  { id: 'creative-studio', label: 'Crear Espacio', icon: Clapperboard },
+  { id: 'cinema-vault', label: 'Cine y Series 5K HD', icon: Film },
   { id: 'library', label: 'Mi Música', icon: Music },
   { id: 'playlists', label: 'Programas y Listas', icon: ListMusic },
   { id: 'streams', label: 'Emisoras Online', icon: Globe },
@@ -83,12 +109,128 @@ export default function App() {
   } | null>(null);
   const [globalDragActive, setGlobalDragActive] = useState(false);
 
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [userProductions, setUserProductions] = useState<CreativeProduction[]>([]);
+  const [publicCatalog, setPublicCatalog] = useState<CreativeProduction[]>([]);
+
   const [clockText, setClockText] = useState(() =>
     new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   );
 
   const globalFileInputRef = useRef<HTMLInputElement | null>(null);
   const prevVolumeRef = useRef(0.85);
+
+  // Firebase Auth & strictly user-segregated Firestore listeners
+  useEffect(() => {
+    let unsubUserProds: (() => void) | null = null;
+    const unsubAuth = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+      if (unsubUserProds) {
+        unsubUserProds();
+        unsubUserProds = null;
+      }
+      if (currentUser && currentUser.emailVerified) {
+        syncUserProfile(currentUser).catch(() => {});
+        unsubUserProds = subscribeUserProductions(currentUser.uid, (items) => {
+          setUserProductions(items);
+        });
+      } else {
+        setUserProductions([]);
+      }
+    });
+
+    const unsubPublic = subscribePublicCatalog((items) => {
+      setPublicCatalog(items);
+    });
+
+    return () => {
+      unsubAuth();
+      unsubPublic();
+      if (unsubUserProds) unsubUserProds();
+    };
+  }, []);
+
+  const handleSignIn = useCallback(async () => {
+    setAuthError(null);
+    setAuthLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'No se pudo iniciar sesión.');
+    } finally {
+      setAuthLoading(false);
+    }
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    await signOutUser();
+    setUserProductions([]);
+  }, []);
+
+  const handleCreateProduction = useCallback(
+    async (
+      draft: Omit<
+        CreativeProduction,
+        | 'ownerId'
+        | 'ownerName'
+        | 'contractSigned'
+        | 'isPaid'
+        | 'licenseTier'
+        | 'isPublicCatalog'
+        | 'createdAtMs'
+        | 'updatedAtMs'
+      >
+    ) => {
+      if (!user) throw new Error('Inicia sesión para guardar en tu histórico personal.');
+      await createUserProduction(user, draft);
+    },
+    [user]
+  );
+
+  const handleSignContract = useCallback(
+    async (
+      production: CreativeProduction,
+      signerName: string,
+      docId: string,
+      hash: string
+    ) => {
+      if (!user) throw new Error('Inicia sesión para firmar el contrato.');
+      await signProductionContract(user.uid, production, signerName, docId, hash);
+    },
+    [user]
+  );
+
+  const handleUnlockPayment = useCallback(
+    async (
+      production: CreativeProduction,
+      tier: Exclude<LicenseTier, 'none'>,
+      amountUsd: number,
+      paymentMethodLabel: string
+    ) => {
+      if (!user) throw new Error('Inicia sesión para liquidar la licencia.');
+      await unlockProductionWithOrder(user.uid, production, tier, amountUsd, paymentMethodLabel);
+    },
+    [user]
+  );
+
+  const handleTogglePublicCatalog = useCallback(
+    async (production: CreativeProduction, makePublic: boolean) => {
+      if (!user) return;
+      await togglePublicCatalogStatus(user.uid, production, makePublic);
+    },
+    [user]
+  );
+
+  const handleDeleteProduction = useCallback(
+    async (productionId: string) => {
+      if (!user) return;
+      await deleteUserProduction(user.uid, productionId);
+    },
+    [user]
+  );
 
   // Live broadcast clock
   useEffect(() => {
@@ -605,7 +747,41 @@ export default function App() {
           </nav>
         </div>
 
-        <div className="p-5 border-t border-white/8 space-y-4">
+        <div className="p-5 border-t border-white/8 space-y-3">
+          {user ? (
+            <div className="rounded-lg bg-[#0B0E14] border border-white/8 p-3 space-y-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-white truncate">
+                  {user.displayName || 'Creador BASA'}
+                </p>
+                <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-white/6 hover:bg-white/10 text-[11px] text-slate-300 hover:text-white cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Cerrar Sesión</span>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                disabled={authLoading}
+                onClick={handleSignIn}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-xs font-semibold text-amber-200 transition-colors cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Registrarse / Entrar</span>
+              </button>
+              {authError && (
+                <p className="text-[11px] text-rose-400 leading-tight">{authError}</p>
+              )}
+            </div>
+          )}
+
           <div className="space-y-1">
             <p className="text-xs text-slate-400 truncate">{config.slogan}</p>
             <div className="flex items-center justify-between text-xs">
@@ -724,6 +900,34 @@ export default function App() {
                   onSaveAiSong={handleSaveAiSong}
                   onDeleteAiSong={handleDeleteAiSong}
                   onPublishToRadio={handlePublishAiSongToRadio}
+                />
+              )}
+
+              {activeView === 'creative-studio' && (
+                <CreativeStudioView
+                  user={user}
+                  authLoading={authLoading}
+                  userProductions={userProductions}
+                  onSignIn={handleSignIn}
+                  onCreateProduction={handleCreateProduction}
+                  onSignContract={handleSignContract}
+                  onUnlockPayment={handleUnlockPayment}
+                  onTogglePublic={handleTogglePublicCatalog}
+                  onOpenCinemaVault={() => setActiveView('cinema-vault')}
+                />
+              )}
+
+              {activeView === 'cinema-vault' && (
+                <CinemaVaultView
+                  user={user}
+                  userProductions={userProductions}
+                  publicCatalog={publicCatalog}
+                  onSignIn={handleSignIn}
+                  onOpenCreativeStudio={() => setActiveView('creative-studio')}
+                  onSignContract={handleSignContract}
+                  onUnlockPayment={handleUnlockPayment}
+                  onTogglePublic={handleTogglePublicCatalog}
+                  onDeleteProduction={handleDeleteProduction}
                 />
               )}
 

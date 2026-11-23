@@ -1,6 +1,8 @@
 export type NavSection =
   | 'studio'
   | 'ai-studio'
+  | 'creative-studio'
+  | 'cinema-vault'
   | 'library'
   | 'playlists'
   | 'streams'
@@ -139,4 +141,60 @@ export interface AiGeneratedSong extends AiSongBlueprint {
   createdAt: number;
   updatedAt: number;
   audioBlob: Blob;
+}
+
+export type ProductionFormat = 'music' | 'video' | 'series' | 'movie';
+export type SourceBasis = 'original' | 'myth' | 'real_history';
+export type VideoResolution = '1080p' | '4K' | '5K';
+export type LicenseTier = 'none' | 'music_single' | 'video_5k' | 'series_film_master';
+
+export interface ProductionCharacter {
+  name: string;
+  role: string;
+  description: string;
+}
+
+export interface ProductionScene {
+  index: number;
+  title: string;
+  durationLabel: string;
+  visualDescription: string;
+  cameraAndLighting: string;
+  dialogue: string;
+  accentColor: string;
+}
+
+export interface CreativeProduction {
+  id: string;
+  ownerId: string;
+  ownerName: string;
+  format: ProductionFormat;
+  sourceBasis: SourceBasis;
+  studioStyle: string;
+  targetPlatform: string;
+  resolution: VideoResolution;
+  promptInput: string;
+  title: string;
+  genre: string;
+  rating: string;
+  logline: string;
+  synopsis: string;
+  lyrics: string;
+  soundtrackPrompt: string;
+  bpm: number;
+  drumStyle: DrumStyle;
+  chordProgression: number[][];
+  bassNotes: number[];
+  melodyNotes: number[];
+  characters: ProductionCharacter[];
+  scenes: ProductionScene[];
+  contractSigned: boolean;
+  contractSignerName?: string;
+  contractDocumentId?: string;
+  contractHash?: string;
+  isPaid: boolean;
+  licenseTier: LicenseTier;
+  isPublicCatalog: boolean;
+  createdAtMs: number;
+  updatedAtMs: number;
 }

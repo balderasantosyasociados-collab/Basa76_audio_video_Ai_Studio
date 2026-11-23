@@ -1,0 +1,233 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && request.auth.token.email_verified == true;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid == userId && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCreativeProduction(data, ownerUid, docId) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'ownerName', 'format', 'sourceBasis', 'studioStyle',
+          'targetPlatform', 'resolution', 'promptInput', 'title', 'genre',
+          'logline', 'synopsis', 'bpm', 'drumStyle', 'contractSigned',
+          'isPaid', 'licenseTier', 'isPublicCatalog', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'ownerName', 'format', 'sourceBasis', 'studioStyle',
+          'targetPlatform', 'resolution', 'promptInput', 'title', 'genre',
+          'rating', 'logline', 'synopsis', 'lyrics', 'soundtrackPrompt',
+          'bpm', 'drumStyle', 'chordProgressionJson', 'bassNotesJson',
+          'melodyNotesJson', 'charactersJson', 'scenesJson',
+          'contractSigned', 'contractSignerName', 'contractDocumentId', 'contractHash',
+          'isPaid', 'licenseTier', 'isPublicCatalog', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string && data.id == docId && isValidId(data.id)
+        && data.ownerId is string && data.ownerId == ownerUid && isValidId(data.ownerId)
+        && data.ownerName is string && data.ownerName.size() >= 1 && data.ownerName.size() <= 120
+        && data.format in ['music', 'video', 'series', 'movie']
+        && data.sourceBasis in ['original', 'myth', 'real_history']
+        && data.studioStyle is string && data.studioStyle.size() >= 1 && data.studioStyle.size() <= 100
+        && data.targetPlatform is string && data.targetPlatform.size() >= 1 && data.targetPlatform.size() <= 60
+        && data.resolution in ['1080p', '4K', '5K']
+        && data.promptInput is string && data.promptInput.size() >= 1 && data.promptInput.size() <= 1500
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 160
+        && data.genre is string && data.genre.size() >= 1 && data.genre.size() <= 100
+        && (!('rating' in data) || (data.rating is string && data.rating.size() <= 20))
+        && data.logline is string && data.logline.size() >= 1 && data.logline.size() <= 500
+        && data.synopsis is string && data.synopsis.size() >= 1 && data.synopsis.size() <= 4000
+        && (!('lyrics' in data) || (data.lyrics is string && data.lyrics.size() <= 5000))
+        && (!('soundtrackPrompt' in data) || (data.soundtrackPrompt is string && data.soundtrackPrompt.size() <= 1000))
+        && data.bpm is int && data.bpm >= 60 && data.bpm <= 200
+        && data.drumStyle in ['reggaeton', 'trap', 'house', 'lofi', 'pop', 'rock', 'afrobeat', 'synthwave']
+        && (!('chordProgressionJson' in data) || (data.chordProgressionJson is string && data.chordProgressionJson.size() <= 1000))
+        && (!('bassNotesJson' in data) || (data.bassNotesJson is string && data.bassNotesJson.size() <= 500))
+        && (!('melodyNotesJson' in data) || (data.melodyNotesJson is string && data.melodyNotesJson.size() <= 500))
+        && (!('charactersJson' in data) || (data.charactersJson is string && data.charactersJson.size() <= 6000))
+        && (!('scenesJson' in data) || (data.scenesJson is string && data.scenesJson.size() <= 20000))
+        && data.contractSigned is bool
+        && (!('contractSignerName' in data) || (data.contractSignerName is string && data.contractSignerName.size() <= 140))
+        && (!('contractDocumentId' in data) || (data.contractDocumentId is string && data.contractDocumentId.size() <= 60))
+        && (!('contractHash' in data) || (data.contractHash is string && data.contractHash.size() <= 120))
+        && data.isPaid is bool
+        && data.licenseTier in ['none', 'music_single', 'video_5k', 'series_film_master']
+        && data.isPublicCatalog is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLicenseOrder(data, ownerUid, orderId) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'productionId', 'licenseTier',
+          'amountUsd', 'paymentMethodLabel', 'status', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'productionId', 'licenseTier',
+          'amountUsd', 'paymentMethodLabel', 'status', 'createdAt'
+        ])
+        && data.id is string && data.id == orderId && isValidId(data.id)
+        && data.ownerId is string && data.ownerId == ownerUid && isValidId(data.ownerId)
+        && data.productionId is string && isValidId(data.productionId)
+        && data.licenseTier in ['music_single', 'video_5k', 'series_film_master']
+        && data.amountUsd is number && data.amountUsd > 0 && data.amountUsd <= 5000
+        && data.paymentMethodLabel is string && data.paymentMethodLabel.size() >= 1 && data.paymentMethodLabel.size() <= 80
+        && data.status == 'paid'
+        && data.createdAt is timestamp;
+    }
+
+    match /test/connection {
+      allow get: if true;
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isVerifiedOwner(userId);
+      allow create: if isValidId(userId)
+        && isVerifiedOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isVerifiedOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt']);
+
+      match /productions/{productionId} {
+        allow get: if isValidId(userId) && isValidId(productionId) && isVerifiedOwner(userId);
+        allow list: if isValidId(userId) && isVerifiedOwner(userId)
+          && resource.data.ownerId == request.auth.uid;
+
+        allow create: if isValidId(userId)
+          && isValidId(productionId)
+          && isVerifiedOwner(userId)
+          && isValidCreativeProduction(incoming(), userId, productionId)
+          && incoming().isPaid == false
+          && incoming().licenseTier == 'none'
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+
+        allow update: if isValidId(userId)
+          && isValidId(productionId)
+          && isVerifiedOwner(userId)
+          && isValidCreativeProduction(incoming(), userId, productionId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            (incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'genre', 'logline', 'synopsis', 'lyrics', 'resolution',
+              'charactersJson', 'scenesJson', 'updatedAt'
+            ]))
+            ||
+            (existing().contractSigned == false
+              && incoming().contractSigned == true
+              && incoming().contractSignerName is string
+              && incoming().contractSignerName.size() >= 2
+              && incoming().contractHash is string
+              && incoming().contractHash.size() >= 8
+              && incoming().diff(existing()).affectedKeys().hasOnly([
+                'contractSigned', 'contractSignerName', 'contractDocumentId', 'contractHash', 'updatedAt'
+              ]))
+            ||
+            (existing().contractSigned == true
+              && existing().isPaid == false
+              && incoming().isPaid == true
+              && incoming().licenseTier in ['music_single', 'video_5k', 'series_film_master']
+              && existsAfter(/databases/$(database)/documents/users/$(userId)/orders/$(('ord_' + productionId)))
+              && incoming().diff(existing()).affectedKeys().hasOnly([
+                'isPaid', 'licenseTier', 'updatedAt'
+              ]))
+            ||
+            (incoming().diff(existing()).affectedKeys().hasOnly([
+              'isPublicCatalog', 'updatedAt'
+            ]))
+          );
+
+        allow delete: if isValidId(userId) && isValidId(productionId) && isVerifiedOwner(userId);
+      }
+
+      match /orders/{orderId} {
+        allow get: if isValidId(userId) && isValidId(orderId) && isVerifiedOwner(userId);
+        allow list: if isValidId(userId) && isVerifiedOwner(userId)
+          && resource.data.ownerId == request.auth.uid;
+
+        allow create: if isValidId(userId)
+          && isValidId(orderId)
+          && isVerifiedOwner(userId)
+          && isValidLicenseOrder(incoming(), userId, orderId)
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId)/productions/$(incoming().productionId));
+      }
+    }
+
+    match /publicCatalog/{productionId} {
+      allow get: if isValidId(productionId) && existing().isPublicCatalog == true;
+      allow list: if resource.data.isPublicCatalog == true;
+
+      allow create: if isValidId(productionId)
+        && isSignedIn()
+        && request.auth.token.email_verified == true
+        && isValidCreativeProduction(incoming(), request.auth.uid, productionId)
+        && incoming().isPublicCatalog == true
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)/productions/$(productionId));
+
+      allow update: if isValidId(productionId)
+        && isSignedIn()
+        && request.auth.token.email_verified == true
+        && existing().ownerId == request.auth.uid
+        && isValidCreativeProduction(incoming(), request.auth.uid, productionId)
+        && incoming().id == existing().id
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'genre', 'logline', 'synopsis', 'lyrics', 'resolution',
+          'charactersJson', 'scenesJson', 'isPublicCatalog', 'contractSigned',
+          'contractSignerName', 'contractDocumentId', 'contractHash', 'isPaid', 'licenseTier', 'updatedAt'
+        ]);
+
+      allow delete: if isValidId(productionId)
+        && isSignedIn()
+        && request.auth.token.email_verified == true
+        && existing().ownerId == request.auth.uid;
+    }
+  }
+}
