@@ -1,9 +1,10 @@
-import { Playlist, RadioStream, StationConfig, Track } from '../types/radio';
+import { AiGeneratedSong, Playlist, RadioStream, StationConfig, Track } from '../types/radio';
 
 const DB_NAME = 'basa_radio_studio_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_TRACKS = 'tracks';
 const STORE_META = 'meta';
+const STORE_AI_SONGS = 'ai_songs';
 
 export const DEFAULT_CONFIG: StationConfig = {
   stationName: 'BASA Radio',
@@ -65,6 +66,9 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_META)) {
         db.createObjectStore(STORE_META, { keyPath: 'key' });
       }
+      if (!db.objectStoreNames.contains(STORE_AI_SONGS)) {
+        db.createObjectStore(STORE_AI_SONGS, { keyPath: 'id' });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -119,6 +123,44 @@ export async function deleteTrackFromDb(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_TRACKS, 'readwrite');
     tx.objectStore(STORE_TRACKS).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function loadAllAiSongs(): Promise<AiGeneratedSong[]> {
+  try {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_AI_SONGS, 'readonly');
+      const req = tx.objectStore(STORE_AI_SONGS).getAll();
+      req.onsuccess = () => {
+        const items = (req.result as AiGeneratedSong[]) || [];
+        items.sort((a, b) => b.createdAt - a.createdAt);
+        resolve(items);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function saveAiSong(song: AiGeneratedSong): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_AI_SONGS, 'readwrite');
+    tx.objectStore(STORE_AI_SONGS).put(song);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function deleteAiSongFromDb(id: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_AI_SONGS, 'readwrite');
+    tx.objectStore(STORE_AI_SONGS).delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

@@ -14,18 +14,29 @@ import {
   VolumeX,
   Menu,
   X,
+  Sparkles,
 } from 'lucide-react';
-import { NavSection, Playlist, RadioStream, StationConfig, Track } from './types/radio';
+import {
+  AiGeneratedSong,
+  NavSection,
+  Playlist,
+  RadioStream,
+  StationConfig,
+  Track,
+} from './types/radio';
 import {
   DEFAULT_CONFIG,
   DEFAULT_STREAMS,
+  deleteAiSongFromDb,
   deleteTrackFromDb,
   isSeeded,
+  loadAllAiSongs,
   loadAllTracks,
   loadConfig,
   loadPlaylists,
   loadStreams,
   markSeeded,
+  saveAiSong,
   saveConfig,
   savePlaylists,
   saveStreams,
@@ -37,6 +48,7 @@ import { formatTime, parseAudioFile } from './utils/id3Parser';
 import { useRadioEngine } from './audio/useRadioEngine';
 import { CoverArtwork } from './components/CoverArtwork';
 import { StudioConsoleView } from './components/StudioConsoleView';
+import { AiMusicStudioView } from './components/AiMusicStudioView';
 import { MusicLibraryView } from './components/MusicLibraryView';
 import { PlaylistsView } from './components/PlaylistsView';
 import { StreamsView } from './components/StreamsView';
@@ -44,6 +56,7 @@ import { EqualizerSettingsView } from './components/EqualizerSettingsView';
 
 const NAV_ITEMS: { id: NavSection; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'studio', label: 'Estudio en Vivo', icon: Radio },
+  { id: 'ai-studio', label: 'IA Musical Autónoma', icon: Sparkles },
   { id: 'library', label: 'Mi Música', icon: Music },
   { id: 'playlists', label: 'Programas y Listas', icon: ListMusic },
   { id: 'streams', label: 'Emisoras Online', icon: Globe },
@@ -55,6 +68,7 @@ export default function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [aiSongs, setAiSongs] = useState<AiGeneratedSong[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [streams, setStreams] = useState<RadioStream[]>(DEFAULT_STREAMS);
   const [config, setConfig] = useState<StationConfig>(DEFAULT_CONFIG);
@@ -94,10 +108,11 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const [loadedConfig, loadedPlaylists, loadedStreams, seeded] = await Promise.all([
+      const [loadedConfig, loadedPlaylists, loadedStreams, loadedAiSongs, seeded] = await Promise.all([
         loadConfig(),
         loadPlaylists(),
         loadStreams(),
+        loadAllAiSongs(),
         isSeeded(),
       ]);
 
@@ -113,6 +128,7 @@ export default function App() {
       setConfig(loadedConfig);
       setPlaylists(loadedPlaylists);
       setStreams(loadedStreams);
+      setAiSongs(loadedAiSongs);
       setTracks(loadedTracks);
       setQueueIds(loadedTracks.filter((t) => !t.isJingle).map((t) => t.id));
       setIsLoaded(true);
@@ -387,6 +403,70 @@ export default function App() {
     });
   }, []);
 
+  // AI Song persistence & radio publishing
+  const handleSaveAiSong = useCallback(async (song: AiGeneratedSong) => {
+    await saveAiSong(song);
+    setAiSongs((prev) => {
+      const exists = prev.some((s) => s.id === song.id);
+      if (exists) {
+        return prev.map((s) => (s.id === song.id ? song : s));
+      }
+      return [song, ...prev];
+    });
+  }, []);
+
+  const handleDeleteAiSong = useCallback(async (id: string) => {
+    await deleteAiSongFromDb(id);
+    setAiSongs((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
+  const handlePublishAiSongToRadio = useCallback(
+    async (song: AiGeneratedSong, playImmediately = false) => {
+      const trackId = song.publishedTrackId || `ai-track-${song.id}`;
+      const radioTrack: Track = {
+        id: trackId,
+        title: song.title,
+        artist: song.artist,
+        album: 'BASA Radio IA Autónoma',
+        genre: song.genre,
+        duration: song.duration,
+        fileSize: song.fileSize,
+        mimeType: 'audio/wav',
+        fileName: `${song.title}.wav`,
+        coverUrl: song.coverUrl,
+        isFavorite: false,
+        isJingle: false,
+        isStarter: false,
+        isAiGenerated: true,
+        lyrics: song.lyrics,
+        playCount: 0,
+        addedAt: Date.now(),
+        audioBlob: song.audioBlob,
+      };
+
+      await saveTrack(radioTrack);
+      setTracks((prev) => {
+        const exists = prev.some((t) => t.id === trackId);
+        return exists ? prev.map((t) => (t.id === trackId ? radioTrack : t)) : [radioTrack, ...prev];
+      });
+      setQueueIds((prev) => (prev.includes(trackId) ? prev : [trackId, ...prev]));
+
+      if (song.publishedTrackId !== trackId) {
+        const updatedSong = { ...song, publishedTrackId: trackId };
+        await saveAiSong(updatedSong);
+        setAiSongs((prev) => prev.map((s) => (s.id === song.id ? updatedSong : s)));
+      }
+
+      if (playImmediately) {
+        // Ensure tracksRef in engine sees the newly published track on next tick
+        window.setTimeout(() => {
+          playTrack(trackId, false);
+        }, 60);
+      }
+    },
+    [playTrack]
+  );
+
   // Global window drag-and-drop for effortless music upload from anywhere
   const handleWindowDragOver = (e: React.DragEvent) => {
     if (e.dataTransfer.types.includes('Files')) {
@@ -633,6 +713,17 @@ export default function App() {
                   onMoveQueueItem={handleMoveQueueItem}
                   onRemoveQueueItem={handleRemoveQueueItem}
                   onOpenUpload={() => setActiveView('library')}
+                />
+              )}
+
+              {activeView === 'ai-studio' && (
+                <AiMusicStudioView
+                  aiSongs={aiSongs}
+                  currentPlayingTrackId={playback.mode === 'track' ? playback.currentTrackId : null}
+                  isPlaying={playback.isPlaying}
+                  onSaveAiSong={handleSaveAiSong}
+                  onDeleteAiSong={handleDeleteAiSong}
+                  onPublishToRadio={handlePublishAiSongToRadio}
                 />
               )}
 

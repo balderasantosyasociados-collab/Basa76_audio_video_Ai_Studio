@@ -1,5 +1,6 @@
 export type NavSection =
   | 'studio'
+  | 'ai-studio'
   | 'library'
   | 'playlists'
   | 'streams'
@@ -19,6 +20,8 @@ export interface Track {
   isFavorite: boolean;
   isJingle: boolean;
   isStarter?: boolean;
+  isAiGenerated?: boolean;
+  lyrics?: string;
   playCount: number;
   addedAt: number;
   audioBlob?: Blob; // persisted in IndexedDB
@@ -74,4 +77,66 @@ export interface PlaybackState {
   micError: string | null;
   streamError: string | null;
   activeJingleId: string | null;
+}
+
+export type DrumStyle =
+  | 'reggaeton'
+  | 'trap'
+  | 'house'
+  | 'lofi'
+  | 'pop'
+  | 'rock'
+  | 'afrobeat'
+  | 'synthwave';
+
+export interface AiTrendItem {
+  id: string;
+  topic: string;
+  sourcePlatform: string;
+  suggestedGenre: string;
+  mood: string;
+  bpm: number;
+  angle: string;
+  musicPrompt: string;
+}
+
+export interface AiTrendSource {
+  title: string;
+  uri: string;
+}
+
+export interface AiSongBlueprint {
+  title: string;
+  artist: string;
+  genre: string;
+  bpm: number;
+  musicalKey: string;
+  mood: string;
+  drumStyle: DrumStyle;
+  sunoPrompt: string;
+  lyrics: string;
+  vocalHookText: string;
+  vocalStyle: string;
+  youtubeTitle: string;
+  youtubeDescription: string;
+  youtubeTags: string[];
+  socialCaption: string;
+  chordProgression: number[][];
+  bassNotes: number[];
+  melodyNotes: number[];
+}
+
+export interface AiGeneratedSong extends AiSongBlueprint {
+  id: string;
+  promptUsed: string;
+  trendTopic?: string;
+  engineLabel: string;
+  hasVocal: boolean;
+  duration: number;
+  fileSize: number;
+  coverUrl: string;
+  publishedTrackId?: string;
+  createdAt: number;
+  updatedAt: number;
+  audioBlob: Blob;
 }
