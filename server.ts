@@ -549,6 +549,108 @@ Genera una producción cinematográfica y musical COMPLETA en JSON estricto:
   }
 });
 
+// 6. YouTube Playlist Export & Premiere Top #1 Launch Strategist (gemini-4-hydrogen)
+app.post('/api/ai/youtube-premiere', async (req: Request, res: Response) => {
+  const ai = getAiClient();
+  if (!ai) {
+    res.status(503).json({
+      error: 'El servicio Gemini aún no tiene una clave configurada en Secrets.',
+    });
+    return;
+  }
+
+  const listName = sanitizeText(req.body?.listName, 120) || 'Sesión Estelar BASA Radio';
+  const premiereDateTime = sanitizeText(req.body?.premiereDateTime, 80);
+  const goal =
+    sanitizeText(req.body?.goal, 220) ||
+    'Posicionar el estreno en Top #1 y maximizar retención y alcance viral masivo en la primera hora';
+  const language = sanitizeText(req.body?.language, 40) || 'Español';
+  const rawTracks = Array.isArray(req.body?.tracks) ? req.body.tracks.slice(0, 40) : [];
+
+  if (rawTracks.length === 0) {
+    res.status(400).json({ error: 'La lista debe contener al menos 1 pista para crear el estreno.' });
+    return;
+  }
+
+  const trackLines = rawTracks
+    .map(
+      (
+        t: { title?: unknown; artist?: unknown; genre?: unknown; timestamp?: unknown },
+        idx: number
+      ) =>
+        `${idx + 1}. [${sanitizeText(t?.timestamp, 20) || '00:00'}] ${sanitizeText(t?.title, 100)} - ${sanitizeText(t?.artist, 80)} (${sanitizeText(t?.genre, 50) || 'Mix'})`
+    )
+    .join('\n');
+
+  try {
+    const prompt = `Eres Director de Crecimiento Viral en YouTube Music y Estratega de Estrenos Globales.
+Diseña un paquete completo de Estreno en YouTube ("YouTube Premiere") en idioma ${language} para la siguiente lista de reproducción / mix de radio:
+Nombre de la lista: "${listName}"
+Objetivo estratégico: "${goal}"
+${premiereDateTime ? `Fecha/hora programada del estreno: ${premiereDateTime}` : ''}
+
+Pistas y capítulos exactos:
+${trackLines}
+
+Genera un JSON estricto con estrategias accionables de alto CTR, retención inicial y distribución en la primera hora:
+- "premiereTitle": Título principal de máximo impacto y alto CTR para el Estreno en YouTube (máx 90 caracteres).
+- "alternativeTitles": Exactamente 3 variantes A/B de título para Test & Compare en YouTube Studio.
+- "premiereDescription": Descripción completa lista para YouTube incluyendo gancho inicial, todos los capítulos exactos con timestamp (00:00 ...), créditos de BASA Radio y llamado a la acción.
+- "pinnedLiveChatMessage": Mensaje fijado para el Chat en Vivo del Estreno para disparar conversación e interacción en los primeros minutos.
+- "first30SecondsHook": Guion visual y sonoro exacto para los primeros 30 segundos del Estreno para retener >80% de audiencia.
+- "thumbnailConcept": Diseño visual exacto de la miniatura (colores, texto de máx 3 palabras, composición de alto contraste).
+- "youtubeTags": 15 etiquetas SEO de alto tráfico para YouTube.
+- "premiereCountdownScript": Guion de animación para la sala de espera (countdown 2 min antes del estreno).
+- "topOneHourlyChecklist": 6 acciones concretas de ejecución minuto a minuto durante la primera hora del lanzamiento para impulsar el ranking hacia el #1 y viralidad masiva.
+- "shortsHooks": 3 ideas de cortes verticales (YouTube Shorts / TikTok / Reels) enlazados al Estreno principal.
+- "viralSocialPost": Publicación lista para compartir el Estreno en WhatsApp, X, Instagram, Facebook y Telegram.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-4-hydrogen',
+      contents: prompt,
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            premiereTitle: { type: Type.STRING },
+            alternativeTitles: { type: Type.ARRAY, items: { type: Type.STRING } },
+            premiereDescription: { type: Type.STRING },
+            pinnedLiveChatMessage: { type: Type.STRING },
+            first30SecondsHook: { type: Type.STRING },
+            thumbnailConcept: { type: Type.STRING },
+            youtubeTags: { type: Type.ARRAY, items: { type: Type.STRING } },
+            premiereCountdownScript: { type: Type.STRING },
+            topOneHourlyChecklist: { type: Type.ARRAY, items: { type: Type.STRING } },
+            shortsHooks: { type: Type.ARRAY, items: { type: Type.STRING } },
+            viralSocialPost: { type: Type.STRING },
+          },
+          required: [
+            'premiereTitle',
+            'alternativeTitles',
+            'premiereDescription',
+            'pinnedLiveChatMessage',
+            'first30SecondsHook',
+            'thumbnailConcept',
+            'youtubeTags',
+            'premiereCountdownScript',
+            'topOneHourlyChecklist',
+            'shortsHooks',
+            'viralSocialPost',
+          ],
+        },
+      },
+    });
+
+    const data = JSON.parse((response.text || '{}').trim());
+    res.json(data);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error generando el plan de estreno YouTube.';
+    res.status(500).json({ error: message });
+  }
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');

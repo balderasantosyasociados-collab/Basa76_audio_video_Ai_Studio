@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FolderPlus, Play, Trash2, Plus, Check } from 'lucide-react';
+import { FolderPlus, Play, Trash2, Plus, Check, Youtube } from 'lucide-react';
 import { Playlist, Track } from '../types/radio';
 import { formatTime } from '../utils/id3Parser';
 import { CoverArtwork } from './CoverArtwork';
@@ -11,6 +11,7 @@ interface PlaylistsViewProps {
   onDeletePlaylist: (id: string) => void;
   onToggleTrackInPlaylist: (playlistId: string, trackId: string) => void;
   onBroadcastPlaylist: (playlist: Playlist) => void;
+  onExportYouTubePlaylist: (playlist: Playlist) => void;
 }
 
 export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
@@ -20,6 +21,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
   onDeletePlaylist,
   onToggleTrackInPlaylist,
   onBroadcastPlaylist,
+  onExportYouTubePlaylist,
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -110,6 +112,15 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
+                        onClick={() => onExportYouTubePlaylist(pl)}
+                        disabled={count === 0}
+                        title="Exportar lista a YouTube y crear estreno"
+                        className="p-2 rounded-lg text-slate-300 hover:text-rose-400 hover:bg-white/10 disabled:opacity-30 cursor-pointer"
+                      >
+                        <Youtube className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => onBroadcastPlaylist(pl)}
                         disabled={count === 0}
                         title="Emitir este programa ahora"
@@ -147,15 +158,26 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                 <h3 className="text-base font-semibold text-white">{selectedPlaylist.name}</h3>
                 <p className="text-xs text-slate-400 mt-0.5">{selectedPlaylist.description}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => onBroadcastPlaylist(selectedPlaylist)}
-                disabled={selectedPlaylist.trackIds.length === 0}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white text-xs font-medium transition-colors cursor-pointer"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Emitir Lista en Auto-DJ</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onExportYouTubePlaylist(selectedPlaylist)}
+                  disabled={selectedPlaylist.trackIds.length === 0}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/15 disabled:opacity-40 text-white text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <Youtube className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Exportar a YouTube y Estreno</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onBroadcastPlaylist(selectedPlaylist)}
+                  disabled={selectedPlaylist.trackIds.length === 0}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Emitir Lista en Auto-DJ</span>
+                </button>
+              </div>
             </div>
 
             <div className="divide-y divide-white/6 max-h-[520px] overflow-y-auto">

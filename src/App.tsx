@@ -28,6 +28,7 @@ import {
   NavSection,
   Playlist,
   RadioStream,
+  RecentPlayEntry,
   StationConfig,
   Track,
 } from './types/radio';
@@ -56,11 +57,13 @@ import {
   loadAllTracks,
   loadConfig,
   loadPlaylists,
+  loadRecentHistory,
   loadStreams,
   markSeeded,
   saveAiSong,
   saveConfig,
   savePlaylists,
+  saveRecentHistory,
   saveStreams,
   saveTrack,
   saveTracksBatch,
@@ -77,6 +80,7 @@ import { MusicLibraryView } from './components/MusicLibraryView';
 import { PlaylistsView } from './components/PlaylistsView';
 import { StreamsView } from './components/StreamsView';
 import { EqualizerSettingsView } from './components/EqualizerSettingsView';
+import { YouTubePlaylistPremiereModal } from './components/YouTubePlaylistPremiereModal';
 
 const NAV_ITEMS: { id: NavSection; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'studio', label: 'Estudio en Vivo', icon: Radio },
@@ -114,6 +118,11 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [userProductions, setUserProductions] = useState<CreativeProduction[]>([]);
   const [publicCatalog, setPublicCatalog] = useState<CreativeProduction[]>([]);
+  const [recentHistory, setRecentHistory] = useState<RecentPlayEntry[]>([]);
+  const [youtubeExportTarget, setYoutubeExportTarget] = useState<{
+    listName: string;
+    tracks: Track[];
+  } | null>(null);
 
   const [clockText, setClockText] = useState(() =>
     new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -250,13 +259,15 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const [loadedConfig, loadedPlaylists, loadedStreams, loadedAiSongs, seeded] = await Promise.all([
-        loadConfig(),
-        loadPlaylists(),
-        loadStreams(),
-        loadAllAiSongs(),
-        isSeeded(),
-      ]);
+      const [loadedConfig, loadedPlaylists, loadedStreams, loadedAiSongs, loadedHistory, seeded] =
+        await Promise.all([
+          loadConfig(),
+          loadPlaylists(),
+          loadStreams(),
+          loadAllAiSongs(),
+          loadRecentHistory(),
+          isSeeded(),
+        ]);
 
       let loadedTracks = await loadAllTracks();
       if (!seeded && loadedTracks.length === 0) {
@@ -271,6 +282,7 @@ export default function App() {
       setPlaylists(loadedPlaylists);
       setStreams(loadedStreams);
       setAiSongs(loadedAiSongs);
+      setRecentHistory(loadedHistory);
       setTracks(loadedTracks);
       setQueueIds(loadedTracks.filter((t) => !t.isJingle).map((t) => t.id));
       setIsLoaded(true);
@@ -289,6 +301,19 @@ export default function App() {
         return updated;
       })
     );
+    setRecentHistory((prev) => {
+      const next: RecentPlayEntry[] = [
+        { trackId, playedAt: Date.now() },
+        ...prev.filter((entry) => entry.trackId !== trackId),
+      ].slice(0, 20);
+      saveRecentHistory(next).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const handleClearRecentHistory = useCallback(() => {
+    setRecentHistory([]);
+    saveRecentHistory([]).catch(() => {});
   }, []);
 
   const {
@@ -326,6 +351,17 @@ export default function App() {
     const map = new Map(tracks.map((t) => [t.id, t]));
     return queueIds.map((id) => map.get(id)).filter((t): t is Track => Boolean(t));
   }, [tracks, queueIds]);
+
+  const recentHistoryResolved = useMemo(() => {
+    const map = new Map(tracks.map((t) => [t.id, t]));
+    return recentHistory
+      .map((entry) => {
+        const track = map.get(entry.trackId);
+        return track ? { track, playedAt: entry.playedAt } : null;
+      })
+      .filter((item): item is { track: Track; playedAt: number } => Boolean(item))
+      .slice(0, 20);
+  }, [tracks, recentHistory]);
 
   const jingles = useMemo(() => tracks.filter((t) => t.isJingle), [tracks]);
 
@@ -521,6 +557,21 @@ export default function App() {
       setActiveView('studio');
     },
     [playTrack, tracks]
+  );
+
+  const handleExportYouTubePlaylist = useCallback(
+    (playlist: Playlist) => {
+      const map = new Map(tracks.map((t) => [t.id, t]));
+      const listTracks = playlist.trackIds
+        .map((id) => map.get(id))
+        .filter((t): t is Track => Boolean(t));
+      if (listTracks.length === 0) return;
+      setYoutubeExportTarget({
+        listName: playlist.name,
+        tracks: listTracks,
+      });
+    },
+    [tracks]
   );
 
   // Streams actions
@@ -864,6 +915,8 @@ export default function App() {
                   currentTrack={currentTrack}
                   currentStream={currentStream}
                   queueTracks={queueTracks}
+                  queueIds={queueIds}
+                  recentHistory={recentHistoryResolved}
                   jingles={jingles}
                   micMonitorEnabled={micMonitorEnabled}
                   onToggleMicMonitor={() => setMicMonitorEnabled((v) => !v)}
@@ -873,6 +926,14 @@ export default function App() {
                   onPrev={playPrevious}
                   onSeek={seekTo}
                   onPlayTrack={(id) => playTrack(id, false)}
+                  onAddToQueue={handleAddToQueue}
+                  onClearRecentHistory={handleClearRecentHistory}
+                  onOpenYouTubeExport={() =>
+                    setYoutubeExportTarget({
+                      listName: `Cola en Vivo · ${config.stationName}`,
+                      tracks: queueTracks,
+                    })
+                  }
                   onTriggerJingle={triggerJingle}
                   onToggleAutoDj={() => updateConfig({ autoDjEnabled: !config.autoDjEnabled })}
                   onToggleShuffle={() => updateConfig({ shuffleEnabled: !config.shuffleEnabled })}
@@ -957,6 +1018,7 @@ export default function App() {
                   onDeletePlaylist={handleDeletePlaylist}
                   onToggleTrackInPlaylist={handleToggleTrackInPlaylist}
                   onBroadcastPlaylist={handleBroadcastPlaylist}
+                  onExportYouTubePlaylist={handleExportYouTubePlaylist}
                 />
               )}
 
@@ -984,6 +1046,14 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {youtubeExportTarget && (
+        <YouTubePlaylistPremiereModal
+          listName={youtubeExportTarget.listName}
+          tracks={youtubeExportTarget.tracks}
+          onClose={() => setYoutubeExportTarget(null)}
+        />
+      )}
 
       {/* Persistent Compact Bottom Broadcast Player Bar */}
       <footer className="fixed bottom-0 inset-x-0 lg:left-[260px] z-30 h-16 sm:h-[72px] bg-[#0F131C]/95 backdrop-blur-md border-t border-white/10 px-4 sm:px-6 flex items-center justify-between gap-4">

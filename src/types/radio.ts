@@ -198,3 +198,23 @@ export interface CreativeProduction {
   createdAtMs: number;
   updatedAtMs: number;
 }
+
+export interface RecentPlayEntry {
+  trackId: string;
+  playedAt: number;
+}
+
+export interface YouTubePremierePlan {
+  premiereTitle: string;
+  alternativeTitles: string[];
+  premiereDescription: string;
+  pinnedLiveChatMessage: string;
+  first30SecondsHook: string;
+  thumbnailConcept: string;
+  youtubeTags: string[];
+  premiereCountdownScript: string;
+  topOneHourlyChecklist: string[];
+  shortsHooks: string[];
+  viralSocialPost: string;
+}
+

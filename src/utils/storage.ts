@@ -1,4 +1,11 @@
-import { AiGeneratedSong, Playlist, RadioStream, StationConfig, Track } from '../types/radio';
+import {
+  AiGeneratedSong,
+  Playlist,
+  RadioStream,
+  RecentPlayEntry,
+  StationConfig,
+  Track,
+} from '../types/radio';
 
 const DB_NAME = 'basa_radio_studio_db';
 const DB_VERSION = 2;
@@ -229,3 +236,13 @@ export async function isSeeded(): Promise<boolean> {
 export async function markSeeded(): Promise<void> {
   await setMeta('seeded_v1', true);
 }
+
+export async function loadRecentHistory(): Promise<RecentPlayEntry[]> {
+  const saved = await getMeta<RecentPlayEntry[]>('recent_history_v1');
+  return Array.isArray(saved) ? saved.slice(0, 20) : [];
+}
+
+export async function saveRecentHistory(entries: RecentPlayEntry[]): Promise<void> {
+  await setMeta('recent_history_v1', entries.slice(0, 20));
+}
+

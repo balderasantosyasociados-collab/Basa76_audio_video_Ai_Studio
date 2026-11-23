@@ -17,6 +17,11 @@ import {
   Upload,
   Zap,
   Headphones,
+  History,
+  ListPlus,
+  Check,
+  Youtube,
+  Trash2,
 } from 'lucide-react';
 import { PlaybackState, RadioStream, StationConfig, Track } from '../types/radio';
 import { formatTime } from '../utils/id3Parser';
@@ -30,6 +35,8 @@ interface StudioConsoleViewProps {
   currentTrack: Track | null;
   currentStream: RadioStream | null;
   queueTracks: Track[];
+  queueIds: string[];
+  recentHistory: { track: Track; playedAt: number }[];
   jingles: Track[];
   micMonitorEnabled: boolean;
   onToggleMicMonitor: () => void;
@@ -39,6 +46,9 @@ interface StudioConsoleViewProps {
   onPrev: () => void;
   onSeek: (sec: number) => void;
   onPlayTrack: (id: string) => void;
+  onAddToQueue: (id: string) => void;
+  onClearRecentHistory: () => void;
+  onOpenYouTubeExport: () => void;
   onTriggerJingle: (track: Track) => void;
   onToggleAutoDj: () => void;
   onToggleShuffle: () => void;
@@ -55,6 +65,8 @@ export const StudioConsoleView: React.FC<StudioConsoleViewProps> = ({
   currentTrack,
   currentStream,
   queueTracks,
+  queueIds,
+  recentHistory,
   jingles,
   micMonitorEnabled,
   onToggleMicMonitor,
@@ -64,6 +76,9 @@ export const StudioConsoleView: React.FC<StudioConsoleViewProps> = ({
   onPrev,
   onSeek,
   onPlayTrack,
+  onAddToQueue,
+  onClearRecentHistory,
+  onOpenYouTubeExport,
   onTriggerJingle,
   onToggleAutoDj,
   onToggleShuffle,
@@ -374,113 +389,228 @@ export const StudioConsoleView: React.FC<StudioConsoleViewProps> = ({
         </div>
       </div>
 
-      {/* Queue / Up Next Table */}
-      <div className="rounded-xl border border-white/10 bg-[#121722] overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/8 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold text-white">Cola de Emisión (Rotación en Vivo)</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Orden de reproducción para el Auto-DJ · Haz clic en cualquier pista para emitirla al instante
-            </p>
-          </div>
-          <div className="text-xs font-mono text-slate-400">
-            {queueTracks.length} {queueTracks.length === 1 ? 'pista en cola' : 'pistas en cola'}
-          </div>
-        </div>
-
-        {queueTracks.length === 0 ? (
-          <div className="p-8 text-center space-y-3">
-            <Radio className="w-8 h-8 text-slate-500 mx-auto" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-slate-200">La cola de emisión está vacía</p>
-              <p className="text-xs text-slate-400">
-                Sube tus canciones MP3 o WAV o añade pistas desde tu biblioteca.
+      {/* Queue + Historial de Reproducción Reciente */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+        {/* Left 7 Cols: Queue / Up Next Table */}
+        <div className="xl:col-span-7 rounded-xl border border-white/10 bg-[#121722] overflow-hidden">
+          <div className="px-5 py-4 border-b border-white/8 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-white">Cola de Emisión (Rotación en Vivo)</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Orden de reproducción para el Auto-DJ · Clic para emitir o exporta a YouTube
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onOpenUpload}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium transition-colors cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Cargar Música Ahora</span>
-            </button>
-          </div>
-        ) : (
-          <div className="divide-y divide-white/6">
-            {queueTracks.map((track, idx) => {
-              const isCurrent = playback.mode === 'track' && playback.currentTrackId === track.id;
-              return (
-                <div
-                  key={track.id}
-                  className={`px-5 py-3 flex items-center justify-between gap-4 transition-colors ${
-                    isCurrent ? 'bg-rose-500/10' : 'hover:bg-white/[0.03]'
-                  }`}
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-mono tabular-nums text-slate-400">
+                {queueTracks.length} {queueTracks.length === 1 ? 'pista' : 'pistas'}
+              </span>
+              {queueTracks.length > 0 && (
+                <button
+                  type="button"
+                  onClick={onOpenYouTubeExport}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600 border border-rose-500/35 text-xs font-semibold text-rose-200 hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
-                  <button
-                    type="button"
-                    onClick={() => onPlayTrack(track.id)}
-                    className="flex items-center gap-3.5 min-w-0 flex-1 text-left cursor-pointer"
-                  >
-                    <span className="font-mono text-xs text-slate-500 w-5 text-right shrink-0">
-                      {isCurrent && playback.isPlaying ? (
-                        <Volume2 className="w-4 h-4 text-rose-400 inline" />
-                      ) : (
-                        String(idx + 1).padStart(2, '0')
-                      )}
-                    </span>
-                    <CoverArtwork
-                      src={track.coverUrl}
-                      alt={track.title}
-                      size="sm"
-                      className="w-10 h-10 rounded-md border border-white/10 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <p className={`text-sm font-medium truncate ${isCurrent ? 'text-rose-300' : 'text-white'}`}>
-                        {track.title}
-                      </p>
-                      <p className="text-xs text-slate-400 truncate">
-                        {track.artist} · {track.genre}
-                      </p>
-                    </div>
-                  </button>
+                  <Youtube className="w-3.5 h-3.5" />
+                  <span>YouTube &amp; Estreno</span>
+                </button>
+              )}
+            </div>
+          </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono text-xs text-slate-400 mr-2 hidden sm:inline">
-                      {formatTime(track.duration)}
-                    </span>
+          {queueTracks.length === 0 ? (
+            <div className="p-8 text-center space-y-3">
+              <Radio className="w-8 h-8 text-slate-500 mx-auto" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-slate-200">La cola de emisión está vacía</p>
+                <p className="text-xs text-slate-400">
+                  Sube tus canciones MP3 o WAV o añade pistas desde tu historial reciente.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onOpenUpload}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium transition-colors cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Cargar Música Ahora</span>
+              </button>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/6 max-h-[480px] overflow-y-auto">
+              {queueTracks.map((track, idx) => {
+                const isCurrent = playback.mode === 'track' && playback.currentTrackId === track.id;
+                return (
+                  <div
+                    key={track.id}
+                    className={`px-5 py-3 flex items-center justify-between gap-4 transition-colors ${
+                      isCurrent ? 'bg-rose-500/10' : 'hover:bg-white/[0.03]'
+                    }`}
+                  >
                     <button
                       type="button"
-                      onClick={() => onMoveQueueItem(idx, -1)}
-                      disabled={idx === 0}
-                      title="Subir en la cola"
-                      className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/8 disabled:opacity-25 cursor-pointer"
+                      onClick={() => onPlayTrack(track.id)}
+                      className="flex items-center gap-3.5 min-w-0 flex-1 text-left cursor-pointer"
                     >
-                      <ArrowUp className="w-3.5 h-3.5" />
+                      <span className="font-mono tabular-nums text-xs text-slate-500 w-5 text-right shrink-0">
+                        {isCurrent && playback.isPlaying ? (
+                          <Volume2 className="w-4 h-4 text-rose-400 inline" />
+                        ) : (
+                          String(idx + 1).padStart(2, '0')
+                        )}
+                      </span>
+                      <CoverArtwork
+                        src={track.coverUrl}
+                        alt={track.title}
+                        size="sm"
+                        className="w-10 h-10 rounded-md border border-white/10 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className={`text-sm font-medium truncate ${isCurrent ? 'text-rose-300' : 'text-white'}`}>
+                          {track.title}
+                        </p>
+                        <p className="text-xs text-slate-400 truncate">
+                          {track.artist} · {track.genre}
+                        </p>
+                      </div>
                     </button>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-mono tabular-nums text-xs text-slate-400 mr-2 hidden sm:inline">
+                        {formatTime(track.duration)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onMoveQueueItem(idx, -1)}
+                        disabled={idx === 0}
+                        title="Subir en la cola"
+                        className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/8 disabled:opacity-25 cursor-pointer"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onMoveQueueItem(idx, 1)}
+                        disabled={idx === queueTracks.length - 1}
+                        title="Bajar en la cola"
+                        className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/8 disabled:opacity-25 cursor-pointer"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveQueueItem(track.id)}
+                        title="Quitar de la cola"
+                        className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-white/8 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Right 5 Cols: Historial de Reproducción Reciente (Últimas 20 pistas) */}
+        <div className="xl:col-span-5 rounded-xl border border-white/10 bg-[#121722] overflow-hidden">
+          <div className="px-5 py-4 border-b border-white/8 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                <History className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="truncate">Historial de Reproducción Reciente</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5 truncate">
+                Últimas 20 pistas emitidas · Vuelve a añadirlas a la cola con un clic
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-mono tabular-nums text-slate-400">
+                {recentHistory.length}/20
+              </span>
+              {recentHistory.length > 0 && (
+                <button
+                  type="button"
+                  onClick={onClearRecentHistory}
+                  title="Limpiar historial reciente"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-white/8 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {recentHistory.length === 0 ? (
+            <div className="p-8 text-center space-y-2">
+              <History className="w-8 h-8 text-slate-500 mx-auto" />
+              <p className="text-sm font-medium text-slate-200">Sin historial reciente aún</p>
+              <p className="text-xs text-slate-400">
+                Reproduce cualquier pista del estudio para ver aquí las últimas 20 canciones emitidas.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/6 max-h-[480px] overflow-y-auto">
+              {recentHistory.slice(0, 20).map(({ track, playedAt }) => {
+                const inQueue = queueIds.includes(track.id);
+                const timeLabel = new Date(playedAt).toLocaleTimeString('es-ES', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+                return (
+                  <div
+                    key={`${track.id}-${playedAt}`}
+                    className="px-4 py-2.5 flex items-center justify-between gap-3 hover:bg-white/[0.03] transition-colors"
+                  >
                     <button
                       type="button"
-                      onClick={() => onMoveQueueItem(idx, 1)}
-                      disabled={idx === queueTracks.length - 1}
-                      title="Bajar en la cola"
-                      className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/8 disabled:opacity-25 cursor-pointer"
+                      onClick={() => onPlayTrack(track.id)}
+                      className="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer"
                     >
-                      <ArrowDown className="w-3.5 h-3.5" />
+                      <CoverArtwork
+                        src={track.coverUrl}
+                        alt={track.title}
+                        size="sm"
+                        className="w-9 h-9 rounded-md border border-white/10 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-white truncate hover:text-rose-300">
+                          {track.title}
+                        </p>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          {track.artist} · <span className="font-mono tabular-nums">{timeLabel}</span> ·{' '}
+                          <span className="font-mono tabular-nums">{formatTime(track.duration)}</span>
+                        </p>
+                      </div>
                     </button>
+
                     <button
                       type="button"
-                      onClick={() => onRemoveQueueItem(track.id)}
-                      title="Quitar de la cola"
-                      className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-white/8 cursor-pointer"
+                      onClick={() => onAddToQueue(track.id)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        inQueue
+                          ? 'bg-emerald-500/12 border-emerald-500/30 text-emerald-300'
+                          : 'bg-white/8 hover:bg-rose-600 border-white/10 hover:border-rose-500 text-white'
+                      }`}
                     >
-                      <X className="w-3.5 h-3.5" />
+                      {inQueue ? (
+                        <>
+                          <Check className="w-3 h-3" />
+                          <span>En cola</span>
+                        </>
+                      ) : (
+                        <>
+                          <ListPlus className="w-3.5 h-3.5" />
+                          <span>Añadir a cola</span>
+                        </>
+                      )}
                     </button>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
